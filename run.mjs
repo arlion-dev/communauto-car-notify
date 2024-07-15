@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { execSync, spawnSync } from 'child_process';
-import dbus from 'dbus-native';
 import { parseArgs } from 'util';
 
 const branchIds = {
