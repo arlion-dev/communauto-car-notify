@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { execSync, spawnSync } from 'child_process';
-import dbus from 'dbus-native';
+import { execSync } from 'child_process';
 import { parseArgs } from 'util';
+import dbus from 'dbus-native';
 
 const branchIds = {
   montreal: 1,
@@ -59,7 +59,7 @@ if (values.city) {
   if (branchIds[values.city]) {
     branchId = branchIds[values.city];
   } else {
-    throw new Error(`City ${values.vity} not yet supported! File a bug`);
+    throw new Error(`City ${values.city} not yet supported! File a bug`);
   }
 } else {
   branchId = branchIds.montreal;
@@ -68,7 +68,27 @@ if (values.city) {
 const location = getLocation();
 console.log('Current location: %s, %s', ...location);
 
+const sessionBus = dbus.sessionBus();
+if (!sessionBus) {
+  throw new Error('Could not connect to the DBus session bus.');
+}
 
+function sendNotification(summary, body) {
+  const service = sessionBus.getService('org.freedesktop.Notifications');
+  service.getInterface('/org/freedesktop/Notifications', 'org.freedesktop.Notifications', (err, notifications) => {
+    if (err) {
+      console.error(err);
+      return;
+    }
+    notifications.Notify('Car Finder', 0, '', summary, body, [], {}, 5000, (err, id) => {
+      if (err) {
+        console.error(err);
+      } else {
+        console.log('Notification sent with id', id);
+      }
+    });
+  });
+}
 
 while(true) {
   const cars = await getCars(location);
@@ -90,43 +110,17 @@ while(true) {
 
     const nextSmallerRadius = distanceRadii.find(i => i < car.distance);
 
-    const args = [
-      '-u',
-      'critical',
-      '-t', '6000',
-      '-p',
-      '-A', 'open=Reserve',
-      '-A', 'stop=Stop looking',
-      'Car found!',
-      `${car.brand} ${car.model} is ${Math.floor(car.distance)}m away`
-    ];
+    sendNotification('Car found!', `${car.brand} ${car.model} is ${Math.floor(car.distance)}m away`);
+
     if (nextSmallerRadius) {
-      args.push('-A', 'reduce=Reduce radius to ' + humanDistance(nextSmallerRadius));
+      distanceRadius = nextSmallerRadius;
     }
-    if (notificationId) args.push('-r', notificationId);
-
-    const res = spawnSync('notify-send', args);
-
-    [notificationId, notifyResult] = res.stdout.toString().split('\n');
-    switch(notifyResult) {
-      case 'open':
-        spawnSync('xdg-open', ['https://ontario.client.reservauto.net/bookCar']);
-        break;
-      case 'reduce' :
-        distanceRadius = nextSmallerRadius;
-        break;
-      case 'stop':
-        process.exit();
-    }
-
   }
 
   await wait(pause * 1000);
-
 }
 
 async function getCars(location) {
-
   const result = await retry(
     async() => fetch(`https://www.reservauto.net/WCF/LSI/LSIBookingServiceV3.svc/GetAvailableVehicles?BranchID=${branchId}&LanguageID=2`)
   );
@@ -140,11 +134,9 @@ async function getCars(location) {
     lng: vehicle.Longitude,
     distance: calculateDistance(...location, vehicle.Latitude, vehicle.Longitude),
   }));
-
 }
 
 function getLocation() {
-
   console.log('Getting current location');
   const result =
     execSync('/usr/libexec/geoclue-2.0/demos/where-am-i -t 6')
@@ -158,11 +150,9 @@ function getLocation() {
   }
 
   return [obj['Latitude'], obj['Longitude']].map(parseFloat);
-
 }
 
 function calculateDistance(lat1, lng1, lat2, lng2) {
-
   const dLat = toRadians(lat2 - lat1);
   const dLon = toRadians(lng2 - lng1);
 
@@ -182,24 +172,18 @@ function toRadians(degrees) {
 }
 
 function wait(ms) {
-
   return new Promise(res => setTimeout(res, ms));
-
 }
 
 function humanDistance(inp) {
-
   if (inp < 1000) return inp + 'm';
   return (inp/1000) + 'km';
-
 }
 
 async function retry(cb, times = 3, delay = 1000) {
-
   try{
     return await cb();
   } catch (err) {
-
     if (times===0) {
       throw err;
     } else {
@@ -207,7 +191,5 @@ async function retry(cb, times = 3, delay = 1000) {
       await wait(delay);
       return retry(cb, times-1, delay);
     }
-
   }
-
 }
