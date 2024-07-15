@@ -3,6 +3,7 @@ import { execSync, spawnSync } from 'child_process';
 import { parseArgs } from 'util';
 
 const branchIds = {
+  montreal: 1,
   quebec: 2,
   toronto: 3,
 };
@@ -17,7 +18,7 @@ const { values } = parseArgs({
     city: {
       type: 'string',
       short: 'c',
-      default: 'toronto',
+      default: 'montreal',
     }
   }
 });
@@ -60,7 +61,7 @@ if (values.city) {
     throw new Error(`City ${values.vity} not yet supported! File a bug`);
   }
 } else {
-  branchId = branchIds.toronto;
+  branchId = branchIds.montreal;
 }
 
 const location = getLocation();
