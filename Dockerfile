@@ -3,8 +3,11 @@ FROM fedora:39
 
 # Installer les dépendances nécessaires
 RUN dnf -y update && \
-    dnf -y install geoclue2-demos nodejs && \
+    dnf -y install geoclue2-demos nodejs dbus && \
     dnf clean all
+
+# Installer les modules Node.js nécessaires
+RUN npm install dbus-native
 
 # Créer un répertoire pour l'application
 WORKDIR /app
@@ -16,7 +19,7 @@ COPY . /app
 RUN chmod +x run.mjs
 
 # Exposer le port si nécessaire (à modifier selon les besoins de l'application)
-EXPOSE 3000
+# EXPOSE 3000
 
 # Commande par défaut pour lancer l'application
 CMD ["./run.mjs", "--city", "montreal"]
